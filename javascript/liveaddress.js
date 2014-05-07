@@ -120,20 +120,25 @@ var LiveAddress = (function()
 		address.json = [];
 		address.batch = batch_id;
 		address.userTimeout = timeout;
-		address.callback = function(response) { _callback(address.id, response); };
+		address.callback = function(response) {  _callback(address.id, response); };
 		_requests[address.id] = address;
 		return address.id;
 	}
 
 	function _queryString(reqid)
-	{
-		var request = _requests[reqid], qs;
+	{		
+		var request = _requests[reqid], qs;		
 		if (_id && _token)
 			qs = "?auth-id=" + _id + "&auth-token=" + _token + "&candidates=" + _candidates;
 		else
 			qs = "?auth-token=" + _id + "&candidates=" + _candidates;
-		for (var prop in request.fields)
-			qs += "&" + prop + "=" + encodeURIComponent(request.fields[prop]);
+		
+		if(request && request.fields) {
+			for (var prop in request.fields) {
+				qs += "&" + prop + "=" + encodeURIComponent(request.fields[prop]);
+			}			
+		}
+		
 		qs += "&callback=" + encodeURIComponent("LiveAddress.request(\"" + reqid + "\").callback");
 		return qs;
 	}
@@ -143,10 +148,12 @@ var LiveAddress = (function()
 		for (var i in reqids)
 		{
 			var dom = document.createElement("script");
-			dom.src = "https://api.smartystreets.com/street-address"
-				+ _queryString(reqids[i]);
-			document.getElementsByTagName('head')[0].appendChild(dom);
-			_requests[reqids[i]].DOM = dom;
+			dom.src = "https://api.smartystreets.com/street-address"+ _queryString(reqids[i]);
+			document.getElementsByTagName('head')[0].appendChild(dom);							
+			if(typeof _requests[reqids[i]] !== "undefined") {				
+				_requests[reqids[i]].DOM = dom;
+			}
+			
 			_timers[reqids[i]] = {
 				attempts: _timers[reqids[i]] ? _timers[reqids[i]].attempts || 0 : 0,
 				timeoutID: setTimeout(_timeoutHandler(reqids[i]), _timeout)
@@ -163,18 +170,21 @@ var LiveAddress = (function()
 			data[i].input_index = request.inputIndex;
 		batch.json = batch.json.concat(data);
 
-		document.getElementsByTagName('head')[0].removeChild(request.DOM);
-		delete _requests[reqid];
+		if(typeof request.DOM !== "undefined") {
+			document.getElementsByTagName('head')[0].removeChild(request.DOM);
+			delete _requests[reqid];
 
-		clearTimeout(_timers[reqid].timeoutID);
-		delete _timers[reqid];
+			clearTimeout(_timers[reqid].timeoutID);
+			delete _timers[reqid];
 
-		if (++batch.returned == batch.size)
-		{
-			var result = batch.userCallback(batch.wrap(batch.json));
-			delete _batches[request.batch];
-			return result;
+			if (++batch.returned == batch.size)
+			{
+				var result = batch.userCallback(batch.wrap(batch.json));
+				delete _batches[request.batch];
+				return result;
+			}
 		}
+		return result;
 	}
 
 	function _timeoutHandler(reqid)
@@ -183,8 +193,11 @@ var LiveAddress = (function()
 		{
 			if (++_timers[reqid].attempts < _maxAttempts)
 				_request([reqid]);
-			else if (typeof _requests[reqid].userTimeout === 'function')
-				_requests[reqid].userTimeout(_requests[reqid].fields);
+			else {
+				if(typeof _requests[reqid] !== "undefined" && typeof _requests[reqid].userTimeout === 'function') {
+					_requests[reqid].userTimeout(_requests[reqid].fields);
+				}
+			}
 		};
 	}
 
@@ -237,8 +250,7 @@ var LiveAddress = (function()
 						addresses.push(addr[idx]);
 				}
 				reqids = _buildComponentizedRequest(addresses, callback, timeout, wrapper);
-			}
-
+			}			
 			_request(reqids);
 		},
 
